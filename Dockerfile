@@ -33,8 +33,12 @@ RUN npm run build
 # Production stage
 FROM node:20-alpine AS production
 
-# Instalar OpenSSL para o Prisma
-RUN apk add --no-cache openssl
+# Instalar OpenSSL 1.1 compat para o Prisma
+RUN apk add --no-cache openssl \
+    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.17/community/x86_64/libssl1.1-1.1.1s-r1.apk \
+    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.17/community/x86_64/libcrypto1.1-1.1.1s-r1.apk \
+    && apk add --no-cache --allow-untrusted libssl1.1-1.1.1s-r1.apk libcrypto1.1-1.1.1s-r1.apk \
+    && rm -f libssl1.1-1.1.1s-r1.apk libcrypto1.1-1.1.1s-r1.apk
 
 WORKDIR /app
 
