@@ -3,7 +3,6 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import fastifyStatic from '@fastify/static'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { prisma } from './lib/prisma.js'
 import { authRoutes } from './routes/auth.routes.js'
 import { categoriasRoutes } from './routes/categorias.routes.js'
@@ -13,9 +12,6 @@ import { pagamentosRoutes } from './routes/pagamentos.routes.js'
 import { transacoesRoutes } from './routes/transacoes.routes.js'
 import { orcamentoRoutes } from './routes/orcamento.routes.js'
 import { dashboardRoutes } from './routes/dashboard.routes.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 // Extender tipos do Fastify para incluir authenticate
 declare module 'fastify' {
@@ -75,7 +71,7 @@ app.register(dashboardRoutes)
 
 // Servir arquivos estáticos do frontend em produção
 if (process.env.NODE_ENV === 'production') {
-  const publicPath = path.join(__dirname, '..', 'public')
+  const publicPath = path.join(process.cwd(), 'public')
   app.register(fastifyStatic, {
     root: publicPath,
     prefix: '/',
