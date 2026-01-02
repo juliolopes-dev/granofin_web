@@ -1,4 +1,5 @@
 # Build stage - Frontend
+# Force rebuild: 2026-01-01
 FROM node:20-slim AS frontend-builder
 
 WORKDIR /app/frontend
