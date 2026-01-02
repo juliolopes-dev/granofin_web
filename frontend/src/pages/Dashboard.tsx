@@ -294,13 +294,13 @@ export function Dashboard() {
         </div>
 
         {/* Próximas contas a vencer */}
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col">
           <div className="flex items-center gap-2 mb-4">
             <FiAlertCircle size={20} className="text-orange-500" />
             <h2 className="text-lg font-semibold text-gray-800">Próximos Vencimentos</h2>
           </div>
           {data?.parcelasProximas && data.parcelasProximas.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[240px] overflow-y-auto pr-1">
               {data.parcelasProximas.map((p) => (
                 <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${p.naoContabilizar ? 'bg-yellow-50 border border-yellow-200' : 'bg-orange-50'}`}>
                   <div>
