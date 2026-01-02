@@ -33,6 +33,9 @@ RUN npm run build
 # Production stage
 FROM node:20-alpine AS production
 
+# Instalar OpenSSL para o Prisma
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Instalar apenas dependências de produção do backend
