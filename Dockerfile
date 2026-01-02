@@ -1,5 +1,5 @@
 # Build stage - Frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -14,7 +14,9 @@ ENV VITE_API_URL=/api
 RUN npm run build
 
 # Build stage - Backend
-FROM node:20-alpine AS backend-builder
+FROM node:20-slim AS backend-builder
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
@@ -31,14 +33,10 @@ RUN npx prisma generate --schema=prisma/schema.prisma
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
-# Instalar OpenSSL 1.1 compat para o Prisma
-RUN apk add --no-cache openssl \
-    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.17/community/x86_64/libssl1.1-1.1.1s-r1.apk \
-    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.17/community/x86_64/libcrypto1.1-1.1.1s-r1.apk \
-    && apk add --no-cache --allow-untrusted libssl1.1-1.1.1s-r1.apk libcrypto1.1-1.1.1s-r1.apk \
-    && rm -f libssl1.1-1.1.1s-r1.apk libcrypto1.1-1.1.1s-r1.apk
+# Instalar OpenSSL para o Prisma
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
