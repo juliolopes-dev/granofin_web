@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum TipoCategoria {
+  DESPESA
+  RECEITA
+}
+
+enum TipoConta {
+  CORRENTE
+  POUPANCA
+  CARTEIRA
+  INVESTIMENTO
+}
+
+enum TipoContaPagar {
+  PARCELADA
+  AVULSA
+}
+
+enum StatusContaPagar {
+  ABERTA
+  QUITADA
+}
+
+enum StatusParcela {
+  PENDENTE
+  PARCIAL
+  PAGA
+}
+
+enum TipoTransacao {
+  ENTRADA
+  SAIDA
+}
+
+// ==================== MODELS ====================
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  categorias   Categoria[]
+  contas       Conta[]
+  contasPagar  ContaPagar[]
+  transacoes   Transacao[]
+  orcamentos   Orcamento[]
+
+  @@map("usuarios")
+}
+
+model Categoria {
+  id             String        @id @default(uuid())
+  usuarioId      String        @map("usuario_id")
+  categoriaPaiId String?       @map("categoria_pai_id")
+  nome           String
+  tipo           TipoCategoria
+  cor            String        @default("#6366f1")
+  icone          String        @default("FiTag")
+  ativo          Boolean       @default(true)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  usuario       Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoriaPai  Categoria?   @relation("SubCategorias", fields: [categoriaPaiId], references: [id], onDelete: SetNull)
+  subcategorias Categoria[]  @relation("SubCategorias")
+  contasPagar   ContaPagar[]
+  transacoes    Transacao[]
+  orcamentos    Orcamento[]
+
+  @@map("categorias")
+}
+
+model Conta {
+  id           String    @id @default(uuid())
+  usuarioId    String    @map("usuario_id")
+  nome         String
+  tipo         TipoConta
+  saldoInicial Decimal   @default(0) @map("saldo_inicial") @db.Decimal(12, 2)
+  cor          String    @default("#22c55e")
+  ativo        Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  pagamentos Pagamento[]
+  transacoes Transacao[]
+
+  @@map("contas")
+}
+
+model ContaPagar {
+  id              String           @id @default(uuid())
+  usuarioId       String           @map("usuario_id")
+  categoriaId     String?          @map("categoria_id")
+  descricao       String
+  valorTotal      Decimal          @map("valor_total") @db.Decimal(12, 2)
+  tipo            TipoContaPagar
+  totalParcelas   Int?             @map("total_parcelas")
+  status          StatusContaPagar @default(ABERTA)
+  observacao      String?
+  naoContabilizar Boolean          @default(false) @map("nao_contabilizar")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  parcelas  Parcela[]
+
+  @@map("contas_pagar")
+}
+
+model Parcela {
+  id             String        @id @default(uuid())
+  contaPagarId   String        @map("conta_pagar_id")
+  numero         Int
+  valor          Decimal       @db.Decimal(12, 2)
+  valorPago      Decimal       @default(0) @map("valor_pago") @db.Decimal(12, 2)
+  dataVencimento DateTime?     @map("data_vencimento")
+  status         StatusParcela @default(PENDENTE)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  contaPagar ContaPagar  @relation(fields: [contaPagarId], references: [id], onDelete: Cascade)
+  pagamentos Pagamento[]
+
+  @@map("parcelas")
+}
+
+model Pagamento {
+  id            String   @id @default(uuid())
+  parcelaId     String   @map("parcela_id")
+  contaId       String   @map("conta_id")
+  valor         Decimal  @db.Decimal(12, 2)
+  dataPagamento DateTime @default(now()) @map("data_pagamento")
+  observacao    String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  parcela Parcela @relation(fields: [parcelaId], references: [id], onDelete: Cascade)
+  conta   Conta   @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("pagamentos")
+}
+
+model Transacao {
+  id          String        @id @default(uuid())
+  usuarioId   String        @map("usuario_id")
+  contaId     String        @map("conta_id")
+  categoriaId String?       @map("categoria_id")
+  tipo        TipoTransacao
+  valor       Decimal       @db.Decimal(12, 2)
+  descricao   String
+  data        DateTime      @default(now())
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  conta     Conta      @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  categoria Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  @@map("transacoes")
+}
+
+model Orcamento {
+  id          String   @id @default(uuid())
+  usuarioId   String   @map("usuario_id")
+  categoriaId String   @map("categoria_id")
+  percentual  Decimal? @db.Decimal(5, 2)
+  valorLimite Decimal? @map("valor_limite") @db.Decimal(12, 2)
+  mes         Int
+  ano         Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, categoriaId, mes, ano])
+  @@map("orcamentos")
+}
