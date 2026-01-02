@@ -228,6 +228,79 @@ export async function transacoesRoutes(app: FastifyInstance) {
     return reply.status(204).send()
   })
 
+  // POST /transacoes/transferencia - Transferir entre contas
+  app.post('/transacoes/transferencia', async (request, reply) => {
+    const { id: usuarioId } = request.user as { id: string }
+
+    const transferSchema = z.object({
+      valor: z.number().positive('Valor deve ser positivo'),
+      data: z.string(),
+      contaOrigemId: z.string().uuid('ID da conta origem inválido'),
+      contaDestinoId: z.string().uuid('ID da conta destino inválido'),
+      descricao: z.string().optional(),
+    })
+
+    try {
+      const data = transferSchema.parse(request.body)
+
+      if (data.contaOrigemId === data.contaDestinoId) {
+        return reply.status(400).send({ error: 'Conta origem e destino devem ser diferentes' })
+      }
+
+      // Verificar se as contas pertencem ao usuário
+      const [contaOrigem, contaDestino] = await Promise.all([
+        prisma.conta.findFirst({ where: { id: data.contaOrigemId, usuarioId } }),
+        prisma.conta.findFirst({ where: { id: data.contaDestinoId, usuarioId } }),
+      ])
+
+      if (!contaOrigem) {
+        return reply.status(404).send({ error: 'Conta origem não encontrada' })
+      }
+      if (!contaDestino) {
+        return reply.status(404).send({ error: 'Conta destino não encontrada' })
+      }
+
+      const dataTransacao = new Date(data.data + 'T12:00:00')
+      const descricao = data.descricao || `Transferência: ${contaOrigem.nome} → ${contaDestino.nome}`
+
+      // Criar as duas transações em uma transação do banco
+      const [saida, entrada] = await prisma.$transaction([
+        prisma.transacao.create({
+          data: {
+            usuarioId,
+            descricao: descricao,
+            valor: data.valor,
+            tipo: 'SAIDA',
+            data: dataTransacao,
+            contaId: data.contaOrigemId,
+          },
+          include: { conta: true },
+        }),
+        prisma.transacao.create({
+          data: {
+            usuarioId,
+            descricao: descricao,
+            valor: data.valor,
+            tipo: 'ENTRADA',
+            data: dataTransacao,
+            contaId: data.contaDestinoId,
+          },
+          include: { conta: true },
+        }),
+      ])
+
+      return reply.status(201).send({ saida, entrada })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.status(400).send({
+          error: 'Dados inválidos',
+          details: error.errors,
+        })
+      }
+      throw error
+    }
+  })
+
   // GET /transacoes/resumo - Resumo das transações
   app.get('/transacoes/resumo', async (request) => {
     const { id: usuarioId } = request.user as { id: string }
