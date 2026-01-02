@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiFileText, FiPlus, FiEye, FiTrash2, FiX, FiCalendar, FiDollarSign } from 'react-icons/fi'
+import { FiFileText, FiPlus, FiEye, FiTrash2, FiX, FiCalendar } from 'react-icons/fi'
 import { api } from '../services/api'
 
 interface Categoria {
