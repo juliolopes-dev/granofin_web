@@ -262,12 +262,15 @@ export function Transacoes() {
     return c.tipo === 'DESPESA'
   })
 
+  // Função para verificar se é transferência (não conta no saldo)
+  const isTransferencia = (descricao: string) => descricao.startsWith('Transferência:')
+
   const totalEntradas = transacoes
-    .filter((t) => t.tipo === 'ENTRADA')
+    .filter((t) => t.tipo === 'ENTRADA' && !isTransferencia(t.descricao))
     .reduce((acc, t) => acc + Number(t.valor), 0)
 
   const totalSaidas = transacoes
-    .filter((t) => t.tipo === 'SAIDA')
+    .filter((t) => t.tipo === 'SAIDA' && !isTransferencia(t.descricao))
     .reduce((acc, t) => acc + Number(t.valor), 0)
 
   return (
