@@ -62,5 +62,5 @@ ENV PORT=3333
 # Expor porta
 EXPOSE 3333
 
-# Comando de inicialização - executa migrations e inicia o servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Comando de inicialização - marca baseline e inicia o servidor
+CMD ["sh", "-c", "npx prisma migrate resolve --applied 0_init 2>/dev/null || true && npx prisma migrate deploy && node dist/server.js"]

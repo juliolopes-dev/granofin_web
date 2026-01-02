@@ -25,4 +25,4 @@ npm-debug.log*
 Thumbs.db
 
 # Prisma
-backend/prisma/migrations/
+# migrations are now tracked
