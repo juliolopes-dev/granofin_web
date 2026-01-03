@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { FiHome, FiTrendingUp, FiTrendingDown, FiDollarSign, FiAlertCircle, FiCreditCard, FiPieChart, FiChevronLeft, FiChevronRight, FiCalendar, FiEye, FiEyeOff } from 'react-icons/fi'
+import { FiHome, FiTrendingUp, FiTrendingDown, FiDollarSign, FiAlertCircle, FiCreditCard, FiPieChart, FiChevronLeft, FiChevronRight, FiCalendar, FiEye, FiEyeOff, FiX } from 'react-icons/fi'
 import { api } from '../services/api'
+
+interface ContaCarteira {
+  id: string
+  nome: string
+  cor: string
+}
 
 interface Conta {
   id: string
@@ -63,9 +69,19 @@ export function Dashboard() {
   const [mes, setMes] = useState(hoje.getMonth() + 1)
   const [ano, setAno] = useState(hoje.getFullYear())
   const [mostrarValores, setMostrarValores] = useState(true)
+  const [contasCarteira, setContasCarteira] = useState<ContaCarteira[]>([])
+  const [isPagamentoOpen, setIsPagamentoOpen] = useState(false)
+  const [selectedParcela, setSelectedParcela] = useState<ParcelaProxima | null>(null)
+  const [pagamentoData, setPagamentoData] = useState({
+    contaId: '',
+    valor: 0,
+    dataPagamento: new Date().toISOString().split('T')[0],
+  })
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadData()
+    loadContas()
   }, [mes, ano])
 
   async function loadData() {
@@ -78,6 +94,60 @@ export function Dashboard() {
       console.error('Erro ao carregar dashboard:', err)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function loadContas() {
+    try {
+      const response = await api.get('/contas')
+      setContasCarteira(response.data.contas)
+    } catch (err) {
+      console.error('Erro ao carregar contas:', err)
+    }
+  }
+
+  function openPagamento(parcela: ParcelaProxima) {
+    setSelectedParcela(parcela)
+    setPagamentoData({
+      contaId: contasCarteira.length > 0 ? contasCarteira[0].id : '',
+      valor: parcela.valor,
+      dataPagamento: new Date().toISOString().split('T')[0],
+    })
+    setError('')
+    setIsPagamentoOpen(true)
+  }
+
+  function closePagamento() {
+    setIsPagamentoOpen(false)
+    setSelectedParcela(null)
+    setError('')
+  }
+
+  async function handlePagamento(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+
+    if (!pagamentoData.contaId) {
+      setError('Selecione uma conta')
+      return
+    }
+
+    if (pagamentoData.valor <= 0) {
+      setError('Valor deve ser maior que zero')
+      return
+    }
+
+    try {
+      await api.post('/pagamentos', {
+        parcelaId: selectedParcela?.id,
+        contaId: pagamentoData.contaId,
+        valor: pagamentoData.valor,
+        dataPagamento: pagamentoData.dataPagamento,
+      })
+      closePagamento()
+      loadData()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao registrar pagamento')
     }
   }
 
@@ -302,7 +372,11 @@ export function Dashboard() {
           {data?.parcelasProximas && data.parcelasProximas.length > 0 ? (
             <div className="space-y-3 max-h-[240px] overflow-y-auto pr-1">
               {data.parcelasProximas.map((p) => (
-                <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${p.naoContabilizar ? 'bg-yellow-50 border border-yellow-200' : 'bg-orange-50'}`}>
+                <div 
+                  key={p.id} 
+                  onClick={() => openPagamento(p)}
+                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer hover:opacity-80 transition ${p.naoContabilizar ? 'bg-yellow-50 border border-yellow-200' : 'bg-orange-50'}`}
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-gray-700">{p.descricao}</p>
@@ -385,6 +459,94 @@ export function Dashboard() {
           <p className="text-gray-500 text-sm">Nenhum gasto registrado neste mês.</p>
         )}
       </div>
+
+      {/* Modal de Pagamento Rápido */}
+      {isPagamentoOpen && selectedParcela && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Registrar Pagamento</h2>
+              <button onClick={closePagamento} className="p-2 text-gray-500 hover:text-gray-700">
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="text-sm text-gray-500">Conta a Pagar</p>
+              <p className="font-medium">{selectedParcela.descricao}</p>
+              <p className="text-sm text-gray-500 mt-1">Parcela {selectedParcela.numero} - Vence em {formatDate(selectedParcela.dataVencimento)}</p>
+              <p className="text-orange-600 font-bold mt-2">
+                Valor: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedParcela.valor)}
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handlePagamento} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Conta de Origem
+                </label>
+                <select
+                  value={pagamentoData.contaId}
+                  onChange={(e) => setPagamentoData({ ...pagamentoData, contaId: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                >
+                  <option value="">Selecione uma conta</option>
+                  {contasCarteira.map((conta) => (
+                    <option key={conta.id} value={conta.id}>{conta.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Valor do Pagamento
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={pagamentoData.valor}
+                  onChange={(e) => setPagamentoData({ ...pagamentoData, valor: Number(e.target.value) })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data do Pagamento
+                </label>
+                <input
+                  type="date"
+                  value={pagamentoData.dataPagamento}
+                  onChange={(e) => setPagamentoData({ ...pagamentoData, dataPagamento: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closePagamento}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Confirmar Pagamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
