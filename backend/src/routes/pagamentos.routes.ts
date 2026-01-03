@@ -57,18 +57,34 @@ export async function pagamentosRoutes(app: FastifyInstance) {
         })
       }
 
-      // Criar pagamento
-      const pagamento = await prisma.pagamento.create({
-        data: {
-          parcelaId: data.parcelaId,
-          contaId: data.contaId,
-          valor: data.valor,
-          dataPagamento: data.dataPagamento
-            ? new Date(data.dataPagamento)
-            : new Date(),
-          observacao: data.observacao,
-        },
-      })
+      const dataPagamento = data.dataPagamento
+        ? new Date(data.dataPagamento + 'T12:00:00')
+        : new Date()
+
+      // Criar pagamento e transação em uma única transação do banco
+      const [pagamento] = await prisma.$transaction([
+        prisma.pagamento.create({
+          data: {
+            parcelaId: data.parcelaId,
+            contaId: data.contaId,
+            valor: data.valor,
+            dataPagamento,
+            observacao: data.observacao,
+          },
+        }),
+        // Criar transação de saída para descontar do saldo da conta
+        prisma.transacao.create({
+          data: {
+            usuarioId,
+            contaId: data.contaId,
+            categoriaId: parcela.contaPagar.categoriaId,
+            tipo: 'SAIDA',
+            valor: data.valor,
+            descricao: `Pagamento: ${parcela.contaPagar.descricao}`,
+            data: dataPagamento,
+          },
+        }),
+      ])
 
       // Atualizar valor pago da parcela
       const novoValorPago = Number(parcela.valorPago) + data.valor
@@ -210,6 +226,17 @@ export async function pagamentosRoutes(app: FastifyInstance) {
         data: { status: 'ABERTA' },
       })
     }
+
+    // Buscar e excluir a transação correspondente ao pagamento
+    const descricaoPagamento = `Pagamento: ${pagamento.parcela.contaPagar.descricao}`
+    await prisma.transacao.deleteMany({
+      where: {
+        usuarioId,
+        contaId: pagamento.contaId,
+        descricao: descricaoPagamento,
+        valor: pagamento.valor,
+      },
+    })
 
     // Excluir pagamento
     await prisma.pagamento.delete({ where: { id } })
